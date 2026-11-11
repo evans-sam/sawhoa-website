@@ -53,14 +53,16 @@ function toQuote(text: string): string {
 
 type ObjectKind = "image" | Extract<ProblemKind, "chart" | "drawing" | "embedded">;
 
-function objectKind(object: EmbeddedObject | undefined): ObjectKind {
+/** What an inserted object is; only an "image" can be shown on the website. */
+export function objectKind(object: EmbeddedObject | undefined): ObjectKind {
   if (object?.embeddedDrawingProperties) return "drawing";
   if (object?.linkedContentReference?.sheetsChartReference) return "chart";
   if (object?.imageProperties && !object.linkedContentReference) return "image";
   return "embedded";
 }
 
-function embeddedObject(doc: DocsDocument, id: string): EmbeddedObject | undefined {
+/** The inline object registered on the doc under `id`, if any. */
+export function embeddedObject(doc: DocsDocument, id: string): EmbeddedObject | undefined {
   return doc.inlineObjects?.[id]?.inlineObjectProperties.embeddedObject;
 }
 

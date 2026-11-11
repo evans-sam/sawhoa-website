@@ -11,6 +11,7 @@ import type {
   EmbeddedObject,
   InlineObject,
   Link,
+  List,
   ParagraphElement,
   StructuralElement,
   TextStyle,
@@ -19,14 +20,17 @@ import type {
 /** Objects a builder created that `doc()` must register by ID. */
 const inlineObjectsOf = new WeakMap<ParagraphElement, InlineObject>();
 const positionedObjectsOf = new WeakMap<StructuralElement, Record<string, unknown>>();
+const listsOf = new WeakMap<StructuralElement, Record<string, List>>();
 
 export function doc(...elements: StructuralElement[]): DocsDocument {
   const inlineObjects: Record<string, InlineObject> = {};
   const positionedObjects: Record<string, unknown> = {};
+  const lists: Record<string, List> = {};
 
   const collect = (content: StructuralElement[]) => {
     for (const element of content) {
       Object.assign(positionedObjects, positionedObjectsOf.get(element));
+      Object.assign(lists, listsOf.get(element));
       for (const run of element.paragraph?.elements ?? []) {
         const object = inlineObjectsOf.get(run);
         if (object) inlineObjects[object.objectId] = object;
@@ -45,6 +49,7 @@ export function doc(...elements: StructuralElement[]): DocsDocument {
   };
   if (Object.keys(inlineObjects).length) result.inlineObjects = inlineObjects;
   if (Object.keys(positionedObjects).length) result.positionedObjects = positionedObjects;
+  if (Object.keys(lists).length) result.lists = lists;
   return result;
 }
 
@@ -61,6 +66,30 @@ export function para(...runs: ParagraphElement[]): StructuralElement {
     elements.push({ textRun: { content: "\n", textStyle: {} } });
   }
   return { paragraph: { elements, paragraphStyle: { namedStyleType: "NORMAL_TEXT" } } };
+}
+
+/** A paragraph in a named style such as "TITLE" or "HEADING_2". */
+export function styled(namedStyleType: string, ...runs: ParagraphElement[]): StructuralElement {
+  const element = para(...runs);
+  element.paragraph!.paragraphStyle = { namedStyleType };
+  return element;
+}
+
+/**
+ * A list item. Items with the same `listId` (by default one per kind) form one
+ * list; `level` is the nesting level, 0 at the outside.
+ */
+export function listItem(
+  { kind, listId = `list.${kind}`, level = 0 }: { kind: "bullet" | "number"; listId?: string; level?: number },
+  ...runs: ParagraphElement[]
+): StructuralElement {
+  const element = para(...runs);
+  element.paragraph!.bullet = { listId, ...(level > 0 && { nestingLevel: level }), textStyle: {} };
+  const nestingLevel = kind === "number" ? { glyphType: "DECIMAL" } : { glyphSymbol: "●" };
+  listsOf.set(element, {
+    [listId]: { listProperties: { nestingLevels: Array.from({ length: 9 }, () => nestingLevel) } },
+  });
+  return element;
 }
 
 /**
@@ -96,16 +125,23 @@ function inlineObject(id: string, embeddedObject: EmbeddedObject): ParagraphElem
   return run;
 }
 
-/** An image placed "In line" with the text. */
+/** An image placed "In line" with the text; `link` is a web address the image links to. */
 export function inlineImage(
   id: string,
-  { title, description, contentUri }: { title?: string; description?: string; contentUri?: string } = {},
+  {
+    title,
+    description,
+    contentUri,
+    link,
+  }: { title?: string; description?: string; contentUri?: string; link?: string } = {},
 ): ParagraphElement {
-  return inlineObject(id, {
+  const run = inlineObject(id, {
     ...(title !== undefined && { title }),
     ...(description !== undefined && { description }),
     imageProperties: { contentUri: contentUri ?? `https://lh7-rt.googleusercontent.com/docsz/${id}` },
   });
+  if (link !== undefined) run.inlineObjectElement!.textStyle = { link: { url: link } };
+  return run;
 }
 
 /** A Google Drawing inserted into the doc. */
@@ -137,6 +173,11 @@ export function equation(): ParagraphElement {
 /** A Drive smart chip. */
 export function richLink(uri: string, title = "Linked file"): ParagraphElement {
   return { richLink: { richLinkId: "kix.rl1", richLinkProperties: { uri, title } } };
+}
+
+/** A person chip. */
+export function personChip(personProperties: { name?: string; email?: string }): ParagraphElement {
+  return { person: { personId: "kix.p1", personProperties } };
 }
 
 /** A date chip showing `displayText`, as Docs displays it. */

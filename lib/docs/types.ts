@@ -10,7 +10,14 @@ export type DocsDocument = {
   body: { content: StructuralElement[] };
   inlineObjects?: Record<string, InlineObject>;
   positionedObjects?: Record<string, unknown>;
-  lists?: Record<string, unknown>;
+  lists?: Record<string, List>;
+};
+
+/** A list's glyphs per nesting level: numbered levels have a `glyphType`, bulleted ones a `glyphSymbol`. */
+export type List = {
+  listProperties?: {
+    nestingLevels?: { glyphType?: string; glyphSymbol?: string }[];
+  };
 };
 
 /** One block of the body: exactly one of the content fields is set. */
