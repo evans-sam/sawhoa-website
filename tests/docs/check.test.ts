@@ -278,14 +278,42 @@ describe("checkImages", () => {
     ]);
   });
 
-  test("a fetch that throws is an unfetchable image", async () => {
+  test("a 404 is an unfetchable image", async () => {
+    const d = doc(para(text("Pool"), inlineImage("kix.i1")));
+    await expect(checkImages(d, respond(404))).resolves.toEqual([
+      { kind: "image-unfetchable", quote: "Pool" },
+    ]);
+  });
+
+  test.each([503, 500, 429, 408])(
+    "a %i rejects as a temporary failure, without the image address",
+    async (status) => {
+      const d = doc(para(text("Pool"), inlineImage("kix.i1", { contentUri: "https://img.test/signed?key=SECRET" })));
+      const error = await checkImages(d, respond(status)).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(/image.*temporarily/i);
+      expect((error as Error).message).toContain(String(status));
+      expect((error as Error).message).not.toContain("img.test");
+    },
+  );
+
+  test("a fetch that throws rejects as a temporary failure", async () => {
     const fetchStub = vi.fn<typeof fetch>(async () => {
-      throw new TypeError("fetch failed");
+      throw new TypeError("fetch failed https://img.test/signed?key=SECRET");
     });
     const d = doc(para(inlineImage("kix.i1")));
-    await expect(checkImages(d, fetchStub)).resolves.toEqual([
-      { kind: "image-unfetchable", quote: "" },
-    ]);
+    const error = await checkImages(d, fetchStub).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/image.*temporarily/i);
+    expect((error as Error).message).not.toContain("SECRET");
+  });
+
+  test("a timeout rejects as a temporary failure", async () => {
+    const fetchStub = vi.fn<typeof fetch>(async () => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    });
+    const d = doc(para(inlineImage("kix.i1")));
+    await expect(checkImages(d, fetchStub)).rejects.toThrow(/temporarily/);
   });
 
   test("an image with no contentUri is unfetchable and nothing is fetched", async () => {

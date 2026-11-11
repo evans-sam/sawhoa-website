@@ -144,20 +144,39 @@ export function checkStructure(doc: DocsDocument, opts: { requireTitle: boolean 
   return problems;
 }
 
-/** Whether a GET of the image succeeds within the time limit. */
-async function canFetch(url: string, fetchImpl: typeof fetch): Promise<boolean> {
-  try {
-    const res = await fetchImpl(url, { signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
-    const ok = res.ok;
-    // Only the status matters; a body that fails to cancel is not a broken image.
-    await res.body?.cancel().catch(() => {});
-    return ok;
-  } catch {
-    return false;
-  }
+/** A 4xx other than 408 and 429: the image is gone or forbidden, not just unavailable for now. */
+function isDefinitelyBroken(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
-/** Fetches every inline image the website would show; each one that fails is `image-unfetchable`. */
+function temporaryFailure(docId: string, reason: string): Error {
+  // The image address is signed, so it is never put in the message.
+  return new Error(`Image fetch for Google Doc ${docId} failed temporarily (${reason})`);
+}
+
+/**
+ * Whether a GET of the image succeeds within the time limit: false for a
+ * definite client error. Throws on a network error, a timeout, 408, 429, a
+ * 5xx or any other status, which say nothing about the doc itself.
+ */
+async function canFetch(url: string, docId: string, fetchImpl: typeof fetch): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetchImpl(url, { signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
+  } catch (error) {
+    throw temporaryFailure(docId, error instanceof Error ? error.name : "network error");
+  }
+  // Only the status matters; a body that fails to cancel is not a broken image.
+  await res.body?.cancel().catch(() => {});
+  if (res.ok) return true;
+  if (isDefinitelyBroken(res.status)) return false;
+  throw temporaryFailure(docId, `status ${res.status}`);
+}
+
+/**
+ * Fetches every inline image the website would show. One with no address or
+ * a definite client error is `image-unfetchable`; a temporary failure throws.
+ */
 export async function checkImages(
   doc: DocsDocument,
   fetchImpl: typeof fetch = fetch,
@@ -172,7 +191,7 @@ export async function checkImages(
       const uri = object?.imageProperties?.contentUri;
       const quote = toQuote(paragraphText(paragraph));
       checks.push(
-        (uri ? canFetch(uri, fetchImpl) : Promise.resolve(false)).then((ok) =>
+        (uri ? canFetch(uri, doc.documentId, fetchImpl) : Promise.resolve(false)).then((ok) =>
           ok ? null : { kind: "image-unfetchable", quote },
         ),
       );

@@ -9,6 +9,8 @@ import { getFileMeta, GoogleError, listFolder, type DriveFile } from "@/lib/goog
 export type Announcement = { id: string; title: string; postedAt: Date; excerpt: string };
 
 const GOOGLE_DOC = "application/vnd.google-apps.document";
+/** The shape of a Drive file ID; anything else is not looked up. */
+const FILE_ID = /^[\w-]{10,}$/;
 /** Docs fetched from Google at once while listing. */
 const PARALLEL_LOADS = 5;
 
@@ -72,12 +74,13 @@ export const listAnnouncements = cache(async (): Promise<Announcement[]> => {
 
 /**
  * The announcement with this doc ID, or null when there is none to show: not a
- * Google Doc in the Announcements folder, a draft, trashed, or unknown to
- * Google. Throws BlockedError when the doc is blocked.
+ * Drive file ID, not a Google Doc in the Announcements folder, a draft,
+ * trashed, or unknown to Google. Throws BlockedError when the doc is blocked.
  */
 export const loadAnnouncement = cache(
   async (id: string): Promise<(Announcement & Converted) | null> => {
     const folderId = googleId("folders", "announcements");
+    if (!FILE_ID.test(id)) return null;
     let file: DriveFile;
     try {
       file = await getFileMeta(id);

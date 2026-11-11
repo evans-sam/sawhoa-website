@@ -10,7 +10,7 @@ import {
   listFolder,
 } from "@/lib/google/api";
 import type { DocsDocument } from "@/lib/docs/types";
-import { doc, para, table, text } from "../docs/builders";
+import { doc, inlineImage, para, table, text } from "../docs/builders";
 import { DOC, file, ids, PDF, serveFolders } from "./fixtures";
 
 vi.mock("@/content/google.json", async () => ({ default: (await import("./fixtures")).ids }));
@@ -48,6 +48,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("isDraft", () => {
@@ -120,6 +121,26 @@ describe("listAnnouncements", () => {
     await expect(listAnnouncements()).rejects.toBeInstanceOf(GoogleError);
   });
 
+  test("rejects when one announcement's image cannot be fetched for now", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    serveFolders({ [FOLDER]: [
+      file("doc-a", "Spring cleanup", DOC, "2026-04-01T15:00:00Z"),
+      file("doc-b", "Pool photo", DOC, "2026-09-01T15:00:00Z"),
+    ] });
+    serveDocs({
+      "doc-a": post("Spring cleanup"),
+      "doc-b": { ...doc(para(text("Pool"), inlineImage("kix.i1"))), title: "Pool photo" },
+    });
+
+    await expect(listAnnouncements()).rejects.toThrow(/temporarily/);
+    expect(createComment).not.toHaveBeenCalled();
+  });
+
   test("rejects when a doc's created time is not a date", async () => {
     serveFolders({ [FOLDER]: [file("doc-a", "Spring cleanup", DOC, "not a date")] });
     serveDocs({ "doc-a": post("Spring cleanup") });
@@ -163,17 +184,18 @@ describe("listAnnouncements", () => {
 
 describe("loadAnnouncement", () => {
   const time = "2026-11-01T16:00:00Z";
+  const ID = "1PoolOpensDoc000000000";
 
   test("a passing doc in the folder: its fields and page", async () => {
     vi.mocked(getFileMeta).mockResolvedValue(
-      file("doc-1", "Pool opens", DOC, time, { parents: [FOLDER] }),
+      file(ID, "Pool opens", DOC, time, { parents: [FOLDER] }),
     );
-    serveDocs({ "doc-1": post("Pool opens") });
+    serveDocs({ [ID]: post("Pool opens") });
 
-    const a = await loadAnnouncement("doc-1");
+    const a = await loadAnnouncement(ID);
 
     expect(a).toMatchObject({
-      id: "doc-1",
+      id: ID,
       title: "Pool opens",
       postedAt: new Date(time),
       excerpt: "Pool opens body text.",
@@ -182,40 +204,48 @@ describe("loadAnnouncement", () => {
   });
 
   test.each([
-    ["a doc in the Pages folder", file("doc-1", "About", DOC, time, { parents: [ids.folders.pages] })],
-    ["a draft", file("doc-1", "Draft: picnic", DOC, time, { parents: [FOLDER] })],
-    ["a PDF", file("doc-1", "Minutes.pdf", PDF, time, { parents: [FOLDER] })],
-    ["a trashed doc", file("doc-1", "Old news", DOC, time, { parents: [FOLDER], trashed: true })],
-    ["a doc with no parents", file("doc-1", "Pool opens", DOC, time)],
+    ["a doc in the Pages folder", file(ID, "About", DOC, time, { parents: [ids.folders.pages] })],
+    ["a draft", file(ID, "Draft: picnic", DOC, time, { parents: [FOLDER] })],
+    ["a PDF", file(ID, "Minutes.pdf", PDF, time, { parents: [FOLDER] })],
+    ["a trashed doc", file(ID, "Old news", DOC, time, { parents: [FOLDER], trashed: true })],
+    ["a doc with no parents", file(ID, "Pool opens", DOC, time)],
   ])("null for %s", async (_, meta) => {
     vi.mocked(getFileMeta).mockResolvedValue(meta);
-    await expect(loadAnnouncement("doc-1")).resolves.toBeNull();
+    await expect(loadAnnouncement(ID)).resolves.toBeNull();
     expect(getDoc).not.toHaveBeenCalled();
   });
 
+  test.each(["x", "../etc", "", "1Pool/../../x0000000"])(
+    "null for the malformed ID %j, without calling Google",
+    async (id) => {
+      await expect(loadAnnouncement(id)).resolves.toBeNull();
+      expect(getFileMeta).not.toHaveBeenCalled();
+    },
+  );
+
   test("null when Google answers 404", async () => {
     vi.mocked(getFileMeta).mockRejectedValue(new GoogleError(404, "File not found"));
-    await expect(loadAnnouncement("nope")).resolves.toBeNull();
+    await expect(loadAnnouncement("1UnknownDoc000000000")).resolves.toBeNull();
   });
 
   test("rejects on any other Google error", async () => {
     vi.mocked(getFileMeta).mockRejectedValue(new GoogleError(500, "Drive failed"));
-    await expect(loadAnnouncement("doc-1")).rejects.toBeInstanceOf(GoogleError);
+    await expect(loadAnnouncement(ID)).rejects.toBeInstanceOf(GoogleError);
   });
 
   test("a blocked doc throws BlockedError", async () => {
     vi.mocked(getFileMeta).mockResolvedValue(
-      file("doc-1", "Fee table", DOC, time, { parents: [FOLDER] }),
+      file(ID, "Fee table", DOC, time, { parents: [FOLDER] }),
     );
-    serveDocs({ "doc-1": { ...doc(table(["Dues", "$300"])), title: "Fee table" } });
-    await expect(loadAnnouncement("doc-1")).rejects.toBeInstanceOf(BlockedError);
+    serveDocs({ [ID]: { ...doc(table(["Dues", "$300"])), title: "Fee table" } });
+    await expect(loadAnnouncement(ID)).rejects.toBeInstanceOf(BlockedError);
   });
 
   test("an untitled doc is blocked", async () => {
     vi.mocked(getFileMeta).mockResolvedValue(
-      file("doc-1", "Untitled document", DOC, time, { parents: [FOLDER] }),
+      file(ID, "Untitled document", DOC, time, { parents: [FOLDER] }),
     );
-    serveDocs({ "doc-1": post("Untitled document") });
-    await expect(loadAnnouncement("doc-1")).rejects.toThrow(/untitled/);
+    serveDocs({ [ID]: post("Untitled document") });
+    await expect(loadAnnouncement(ID)).rejects.toThrow(/untitled/);
   });
 });

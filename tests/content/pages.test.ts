@@ -12,7 +12,7 @@ import {
   resolveComment,
 } from "@/lib/google/api";
 import type { DocsDocument } from "@/lib/docs/types";
-import { doc, para, styled, table, text } from "../docs/builders";
+import { doc, inlineImage, para, styled, table, text } from "../docs/builders";
 import { file, ids, PDF, serveFolders } from "./fixtures";
 
 vi.mock("@/content/google.json", async () => ({ default: (await import("./fixtures")).ids }));
@@ -38,6 +38,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.resetAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("loadPage", () => {
@@ -69,6 +70,36 @@ describe("loadPage", () => {
       ids.pages.about,
       commentText({ kind: "table", quote: "Dues" }),
     );
+  });
+
+  test("the message uses the trimmed doc title", async () => {
+    vi.mocked(getDoc).mockResolvedValue(titled("  About the HOA \n", doc(table(["Dues"]))));
+    const error = (await loadPage("about").catch((e: unknown) => e)) as BlockedError;
+    expect(error.docTitle).toBe("About the HOA");
+    expect(error.message).toMatch(/^Blocked: "About the HOA" \(/);
+  });
+
+  test("an image host failing for now rejects without BlockedError or comment changes", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 503 })));
+    vi.mocked(listComments).mockResolvedValue([
+      {
+        id: "c1",
+        content: commentText({ kind: "image-unfetchable", quote: "Pool" }),
+        resolved: false,
+        author: { me: true },
+      },
+    ]);
+    vi.mocked(getDoc).mockResolvedValue(
+      titled("About", doc(para(text("Pool"), inlineImage("kix.i1")))),
+    );
+
+    const error = await loadPage("about").catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(BlockedError);
+    expect((error as Error).message).toMatch(/temporarily/);
+    expect(createComment).not.toHaveBeenCalled();
+    expect(resolveComment).not.toHaveBeenCalled();
   });
 
   test("a clean doc with a stale comment of ours: the comment is resolved", async () => {
