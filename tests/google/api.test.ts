@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   GoogleError,
+  downloadFile,
   getDoc,
   listEvents,
   listFolder,
@@ -141,6 +142,59 @@ describe("getDoc", () => {
     expect((error as GoogleError).message).not.toContain(TOKEN);
     expect((error as GoogleError).message).toContain("500");
     expect((error as GoogleError).message).toContain("Internal error");
+  });
+});
+
+describe("downloadFile", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Fake timers do not drive AbortSignal.timeout; route it through the faked
+    // setTimeout so a whole-request timeout would show up in these tests too.
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      const controller = new AbortController();
+      setTimeout(
+        () => controller.abort(new DOMException("timed out", "TimeoutError")),
+        ms,
+      );
+      return controller.signal;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  test("does not abort the body once the headers have arrived", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("pdf bytes"));
+
+    const res = await downloadFile("file-1");
+    const { url, init } = requestAt(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(url.searchParams.get("alt")).toBe("media");
+    expect(init.signal?.aborted).toBe(false);
+    await expect(res.text()).resolves.toBe("pdf bytes");
+  });
+
+  test("aborts at 10 s when the headers never arrive", async () => {
+    fetchMock.mockImplementationOnce(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason),
+          );
+        }),
+    );
+
+    const download = downloadFile("file-1").catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(requestAt(0).init.signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+
+    const error = await download;
+    expect(requestAt(0).init.signal?.aborted).toBe(true);
+    expect((error as Error).name).toBe("TimeoutError");
   });
 });
 

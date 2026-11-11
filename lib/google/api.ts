@@ -59,20 +59,51 @@ function driveUrl(path: string, fields: string, params: Params = {}): URL {
   return buildUrl(DRIVE, path, { ...params, fields, supportsAllDrives: "true" });
 }
 
+type SendOptions = {
+  method?: string;
+  body?: unknown;
+  /**
+   * "request" (default): the time limit covers the whole request, body included.
+   * "headers": it covers only the wait for a successful response's headers, so
+   * a returned body can be streamed for as long as it takes.
+   */
+  timeout?: "request" | "headers";
+};
+
 /** Sends an authorised request; throws GoogleError on a non-2xx response. */
-async function send(url: URL, method = "GET", body?: unknown): Promise<Response> {
+async function send(
+  url: URL,
+  { method = "GET", body, timeout = "request" }: SendOptions = {},
+): Promise<Response> {
   const token = await getAccessToken();
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store",
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!res.ok) {
+  let signal: AbortSignal;
+  let stopTimer = () => {};
+  if (timeout === "headers") {
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(new DOMException("Request timed out", "TimeoutError")),
+      TIMEOUT_MS,
+    );
+    signal = controller.signal;
+    stopTimer = () => clearTimeout(timer);
+  } else {
+    signal = AbortSignal.timeout(TIMEOUT_MS);
+  }
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+      signal,
+    });
+    if (res.ok) return res;
+
+    // Reading the error body stays under the time limit.
     let detail = "";
     try {
       const data = (await res.json()) as { error?: { message?: unknown } };
@@ -82,8 +113,9 @@ async function send(url: URL, method = "GET", body?: unknown): Promise<Response>
     }
     const message = `${method} ${url.origin}${url.pathname} failed with ${res.status}${detail}`;
     throw new GoogleError(res.status, message.replaceAll(token, "[token]"));
+  } finally {
+    stopTimer();
   }
-  return res;
 }
 
 async function getJson<T>(url: URL): Promise<T> {
@@ -137,9 +169,14 @@ export async function getFileMeta(fileId: string): Promise<DriveFile> {
   return getJson(driveUrl(`/${encodeURIComponent(fileId)}`, FILE_FIELDS));
 }
 
-/** The file's content as an unread Response, for streaming to the visitor. */
+/**
+ * The file's content as an unread Response, for streaming to the visitor.
+ * The 10 s limit covers the wait for headers only, not the body.
+ */
 export async function downloadFile(fileId: string): Promise<Response> {
-  return send(driveUrl(`/${encodeURIComponent(fileId)}`, "id", { alt: "media" }));
+  return send(driveUrl(`/${encodeURIComponent(fileId)}`, "id", { alt: "media" }), {
+    timeout: "headers",
+  });
 }
 
 /** Every entry between the two times, recurring entries expanded, in start order. */
@@ -177,8 +214,9 @@ export async function listComments(fileId: string): Promise<DriveComment[]> {
 }
 
 export async function createComment(fileId: string, content: string): Promise<void> {
-  await send(driveUrl(`/${encodeURIComponent(fileId)}/comments`, "id"), "POST", {
-    content,
+  await send(driveUrl(`/${encodeURIComponent(fileId)}/comments`, "id"), {
+    method: "POST",
+    body: { content },
   });
 }
 
@@ -189,7 +227,6 @@ export async function resolveComment(fileId: string, commentId: string): Promise
       `/${encodeURIComponent(fileId)}/comments/${encodeURIComponent(commentId)}/replies`,
       "id",
     ),
-    "POST",
-    { action: "resolve", content: "Fixed. Thank you." },
+    { method: "POST", body: { action: "resolve", content: "Fixed. Thank you." } },
   );
 }
