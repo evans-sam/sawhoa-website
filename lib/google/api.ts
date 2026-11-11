@@ -1,3 +1,4 @@
+import type { DocsDocument } from "@/lib/docs/types";
 import { getAccessToken } from "@/lib/google/auth";
 
 const DOCS = "https://docs.googleapis.com/v1/documents";
@@ -144,7 +145,7 @@ function withPageToken(params: Params, pageToken?: string): Params {
 }
 
 /** The Docs API document, with suggested edits left out. */
-export async function getDoc(docId: string): Promise<unknown> {
+export async function getDoc(docId: string): Promise<DocsDocument> {
   return getJson(
     buildUrl(DOCS, `/${encodeURIComponent(docId)}`, {
       suggestionsViewMode: "PREVIEW_WITHOUT_SUGGESTIONS",
