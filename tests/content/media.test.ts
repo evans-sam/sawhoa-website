@@ -69,6 +69,8 @@ describe("openPdf", () => {
     expect(res?.headers.get("Content-Length")).toBe("5");
     expect(res?.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(res?.headers.get("Cache-Control")).toBe("public, max-age=300, s-maxage=3600");
+    // A sandbox CSP would stop Chrome's built-in viewer showing the PDF.
+    expect(res?.headers.get("Content-Security-Policy")).toBeNull();
     expect(res?.headers.get("Content-Disposition")).toBe(
       `inline; filename="June 2026 Newsletter.pdf"; filename*=UTF-8''June%202026%20Newsletter.pdf`,
     );
@@ -163,6 +165,7 @@ describe("openDocImage", () => {
     expect(res?.headers.get("Cache-Control")).toBe(
       "public, max-age=86400, s-maxage=604800, immutable",
     );
+    expect(res?.headers.get("Content-Security-Policy")).toBe("default-src 'none'; sandbox");
     expect(new Uint8Array(await res!.arrayBuffer())).toEqual(BYTES);
     expect(fetchMock).toHaveBeenCalledWith(IMAGE_URI, expect.anything());
     // A page doc is known from content/google.json; Drive is not asked about it.
@@ -185,6 +188,8 @@ describe("openDocImage", () => {
   test.each([
     ["a doc in some other folder", file(ANNOUNCEMENT, "Secret", DOC, "2026-05-01T00:00:00Z", { parents: ["1SomeOtherFolder0000000000000000"] })],
     ["a trashed announcement", file(ANNOUNCEMENT, "Old", DOC, "2026-05-01T00:00:00Z", { parents: [ids.folders.announcements], trashed: true })],
+    ["a draft announcement", file(ANNOUNCEMENT, "DRAFT picnic", DOC, "2026-05-01T00:00:00Z", { parents: [ids.folders.announcements] })],
+    ["a draft announcement with a leading space", file(ANNOUNCEMENT, " draft: x", DOC, "2026-05-01T00:00:00Z", { parents: [ids.folders.announcements] })],
     ["a PDF in the Announcements folder", file(ANNOUNCEMENT, "x.pdf", PDF, "2026-05-01T00:00:00Z", { parents: [ids.folders.announcements] })],
   ])("null for %s, and the doc is not read", async (_, meta) => {
     serveMeta(meta);
@@ -261,7 +266,14 @@ describe("openDocImage", () => {
     expect((error as Error).message).not.toContain(IMAGE_URI);
   });
 
-  test.each(["image/svg+xml", "IMAGE/SVG+XML; charset=utf-8", "text/html", ""])(
+  test("the validated media type is sent, not the raw upstream value", async () => {
+    serveDoc(PAGE_DOC, pageDoc);
+    stubImageFetch(imageResponse("Image/PNG; name=x"));
+    const res = await openDocImage(PAGE_DOC, "kix.img1");
+    expect(res?.headers.get("Content-Type")).toBe("image/png");
+  });
+
+  test.each(["image/svg+xml", "IMAGE/SVG+XML; charset=utf-8", "text/html", "", "image/png, text/html", "image/"])(
     "null when the upstream content type is %j",
     async (type) => {
       serveDoc(PAGE_DOC, pageDoc);

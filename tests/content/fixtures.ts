@@ -47,13 +47,15 @@ export function file(
 
 /**
  * Makes the mocked listFolder answer from this map of folder ID to files;
- * any other content folder is empty. Call it from a test file that mocks
+ * any other content folder is empty. A file given without `parents` is
+ * listed with this folder as its parent. Call it from a test file that mocks
  * "@/lib/google/api".
  */
 export function serveFolders(folders: Record<string, DriveFile[]>): void {
   const known = new Set(Object.values(ids.folders));
   vi.mocked(listFolder).mockImplementation(async (id) => {
-    if (folders[id]) return folders[id];
+    // Drive lists each file with its parents, so a listed file is in the folder.
+    if (folders[id]) return folders[id].map((f) => ({ parents: [id], ...f }));
     if (known.has(id)) return [];
     throw new Error(`unexpected listFolder(${id})`);
   });

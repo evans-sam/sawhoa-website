@@ -17,9 +17,18 @@ export function isDraft(title: string): boolean {
   return /^\s*draft/i.test(title);
 }
 
-/** A Google Doc that is neither trashed nor a draft. */
-function isPublishable(file: DriveFile): boolean {
-  return file.mimeType === GOOGLE_DOC && file.trashed !== true && !isDraft(file.name);
+/**
+ * A published announcement: a Google Doc in the Announcements folder that is
+ * neither trashed nor a draft. The one rule for every place that shows an
+ * announcement or anything from one.
+ */
+export function isPublishedAnnouncement(file: DriveFile, folderId: string): boolean {
+  return (
+    file.mimeType === GOOGLE_DOC &&
+    file.parents?.includes(folderId) === true &&
+    file.trashed !== true &&
+    !isDraft(file.name)
+  );
 }
 
 async function load(file: DriveFile): Promise<Announcement & Converted> {
@@ -54,7 +63,8 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 
 /** The published announcements whose docs pass the checks, newest first. */
 export const listAnnouncements = cache(async (): Promise<Announcement[]> => {
-  const files = (await listFolder(googleId("folders", "announcements"))).filter(isPublishable);
+  const folderId = googleId("folders", "announcements");
+  const files = (await listFolder(folderId)).filter((f) => isPublishedAnnouncement(f, folderId));
   const loaded = await mapLimit(files, PARALLEL_LOADS, async (file) => {
     try {
       return await load(file);
@@ -86,7 +96,7 @@ export const loadAnnouncement = cache(
       if (error instanceof GoogleError && error.status === 404) return null;
       throw error;
     }
-    if (!isPublishable(file) || !file.parents?.includes(folderId)) return null;
+    if (!isPublishedAnnouncement(file, folderId)) return null;
     return load(file);
   },
 );

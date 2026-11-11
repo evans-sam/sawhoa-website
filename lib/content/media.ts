@@ -1,14 +1,19 @@
 import google from "@/content/google.json";
+import { isPublishedAnnouncement } from "@/lib/content/announcements";
 import { FILE_ID, googleId } from "@/lib/content/ids";
 import { embeddedObject, objectKind } from "@/lib/docs/check";
 import { downloadFile, getDoc, getFileMeta, GoogleError } from "@/lib/google/api";
 
 const PDF = "application/pdf";
-const GOOGLE_DOC = "application/vnd.google-apps.document";
 const PDF_CACHE = "public, max-age=300, s-maxage=3600";
 /** A Docs object ID changes when the image is replaced, so the bytes never change. */
 const IMAGE_CACHE = "public, max-age=86400, s-maxage=604800, immutable";
 const IMAGE_TIMEOUT_MS = 10_000;
+/**
+ * Images only: a PDF keeps no CSP, because a `sandbox` document cannot show
+ * Chrome's built-in PDF viewer.
+ */
+const IMAGE_CSP = "default-src 'none'; sandbox";
 
 /** Google statuses that mean "this visitor gets nothing here", not "Google is unwell". */
 const NOT_SERVABLE = new Set([400, 403, 404]);
@@ -74,17 +79,12 @@ export async function openPdf(fileId: string): Promise<Response | null> {
   return new Response(upstream.body, { status: 200, headers });
 }
 
-/** The six page docs, or a Google Doc in the Announcements folder that is not trashed. */
+/** One of the six page docs, or a published announcement. */
 async function isServableDoc(docId: string): Promise<boolean> {
   if (Object.values(google.pages).includes(docId)) return true;
   const folderId = googleId("folders", "announcements");
   const file = await unlessMissing(getFileMeta(docId));
-  return (
-    file !== null &&
-    file.mimeType === GOOGLE_DOC &&
-    file.trashed !== true &&
-    file.parents?.includes(folderId) === true
-  );
+  return file !== null && isPublishedAnnouncement(file, folderId);
 }
 
 function imageFailure(docId: string, reason: string): Error {
@@ -111,10 +111,15 @@ async function fetchImage(uri: string, docId: string): Promise<Response> {
   }
 }
 
-/** A raster image type the site passes on; SVG is refused because it can carry script. */
+/**
+ * The media type of a raster image the site passes on, normalised (lower case,
+ * parameters dropped), or null. SVG is refused because it can carry script; a
+ * value that is not a single well-formed type is refused too.
+ */
 function servableImageType(contentType: string | null): string | null {
   const type = contentType?.split(";")[0].trim().toLowerCase() ?? "";
-  return type.startsWith("image/") && type !== "image/svg+xml" ? contentType : null;
+  if (!/^image\/[a-z0-9][a-z0-9.+-]*$/.test(type) || type === "image/svg+xml") return null;
+  return type;
 }
 
 /**
@@ -145,8 +150,7 @@ export async function openDocImage(docId: string, objectId: string): Promise<Res
     await upstream.body?.cancel().catch(() => {});
     return null;
   }
-  return new Response(upstream.body, {
-    status: 200,
-    headers: streamHeaders(upstream, contentType, IMAGE_CACHE),
-  });
+  const headers = streamHeaders(upstream, contentType, IMAGE_CACHE);
+  headers.set("Content-Security-Policy", IMAGE_CSP);
+  return new Response(upstream.body, { status: 200, headers });
 }
