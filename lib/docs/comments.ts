@@ -47,15 +47,15 @@ function logFailure(what: string, fileId: string, error: unknown): void {
  * doc may post a comment twice; that is accepted.
  */
 export async function syncComments(fileId: string, problems: Problem[]): Promise<void> {
-  let existing: DriveComment[];
+  let plan: { create: string[]; resolve: string[] };
   try {
-    existing = await listComments(fileId);
+    plan = planComments(problems, await listComments(fileId));
   } catch (error) {
-    logFailure("list comments", fileId, error);
+    logFailure("read comments", fileId, error);
     return;
   }
 
-  const { create, resolve } = planComments(problems, existing);
+  const { create, resolve } = plan;
   await Promise.all([
     ...create.map(async (text) => {
       try {

@@ -122,6 +122,13 @@ describe("syncComments", () => {
     expect(errors).toHaveBeenCalledTimes(2);
   });
 
+  test("resolves normally when the listed comments are malformed", async () => {
+    vi.mocked(listComments).mockResolvedValue([{ id: "c1", author: { me: true } } as DriveComment]);
+    await expect(syncComments("doc-1", [table])).resolves.toBeUndefined();
+    expect(createComment).not.toHaveBeenCalled();
+    expect(errors).toHaveBeenCalledOnce();
+  });
+
   test("resolves normally when a call throws synchronously", async () => {
     vi.mocked(listComments).mockImplementation(() => {
       throw new Error("boom");
