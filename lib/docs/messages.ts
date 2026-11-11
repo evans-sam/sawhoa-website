@@ -1,6 +1,6 @@
 import type { Problem, ProblemKind } from "@/lib/docs/types";
 
-const STILL_SHOWING = "The page will keep showing its previous version until this is fixed.";
+const NOT_SHOWN = "The website won't show this change until it's fixed.";
 
 /** `near "<quote>"`, or nothing when there is no quote. */
 function near(quote: string): string {
@@ -46,5 +46,5 @@ const MESSAGES: Record<ProblemKind, (quote: string) => string> = {
 
 /** The comment posted on the doc for one problem: what is wrong and what to do. */
 export function commentText(p: Problem): string {
-  return `Website: ${MESSAGES[p.kind](p.quote)} ${STILL_SHOWING}`;
+  return `Website: ${MESSAGES[p.kind](p.quote)} ${NOT_SHOWN}`;
 }

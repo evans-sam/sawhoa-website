@@ -139,6 +139,11 @@ export function richLink(uri: string, title = "Linked file"): ParagraphElement {
   return { richLink: { richLinkId: "kix.rl1", richLinkProperties: { uri, title } } };
 }
 
+/** A date chip showing `displayText`, as Docs displays it. */
+export function dateChip(displayText: string): ParagraphElement {
+  return { dateElement: { dateElementProperties: { displayText } } };
+}
+
 export function pageBreak(): ParagraphElement {
   return { pageBreak: {} };
 }

@@ -33,10 +33,16 @@ function* paragraphs(content: StructuralElement[]): Generator<Paragraph> {
   }
 }
 
-/** A paragraph's visible text, smart-chip titles included. */
+/** A paragraph's visible text, smart-chip titles and date chips included. */
 function paragraphText(paragraph: Paragraph): string {
   return paragraph.elements
-    .map((e) => e.textRun?.content ?? e.richLink?.richLinkProperties.title ?? "")
+    .map(
+      (e) =>
+        e.textRun?.content ??
+        e.richLink?.richLinkProperties.title ??
+        e.dateElement?.dateElementProperties?.displayText ??
+        "",
+    )
     .join("");
 }
 
@@ -132,8 +138,10 @@ export function checkStructure(doc: DocsDocument, opts: { requireTitle: boolean 
 async function canFetch(url: string, fetchImpl: typeof fetch): Promise<boolean> {
   try {
     const res = await fetchImpl(url, { signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) });
-    await res.body?.cancel();
-    return res.ok;
+    const ok = res.ok;
+    // Only the status matters; a body that fails to cancel is not a broken image.
+    await res.body?.cancel().catch(() => {});
+    return ok;
   } catch {
     return false;
   }

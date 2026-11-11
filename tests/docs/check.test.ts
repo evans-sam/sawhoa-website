@@ -4,6 +4,7 @@ import { commentText } from "@/lib/docs/messages";
 import type { DocsDocument, ProblemKind, StructuralElement } from "@/lib/docs/types";
 import {
   chart,
+  dateChip,
   doc,
   drawing,
   embedded,
@@ -51,6 +52,24 @@ describe("checkStructure", () => {
 
   test("a doc with only an inline image is not empty", () => {
     expect(check(para(inlineImage("kix.img1")))).toEqual([]);
+  });
+
+  test("a doc with only a date chip is not empty, and the chip is quoted", () => {
+    expect(check(para(dateChip("Nov 11, 2026")))).toEqual([]);
+    expect(check(para(text("Meeting on "), dateChip("Nov 11, 2026"), equation()))).toEqual([
+      { kind: "equation", quote: "Meeting on Nov 11, 2026" },
+    ]);
+  });
+
+  test("an inline object missing from the doc's inlineObjects is embedded", () => {
+    const d = doc(para(text("See "), { inlineObjectElement: { inlineObjectId: "kix.gone" } }));
+    expect(checkStructure(d, opts)).toEqual([{ kind: "embedded", quote: "See" }]);
+  });
+
+  test("an image with a link to something other than a Sheets chart is embedded", () => {
+    const d = doc(para(text("Slide "), inlineImage("kix.s1")));
+    d.inlineObjects!["kix.s1"].inlineObjectProperties.embeddedObject.linkedContentReference = {};
+    expect(checkStructure(d, opts)).toEqual([{ kind: "embedded", quote: "Slide" }]);
   });
 
   describe("title", () => {
@@ -245,6 +264,34 @@ describe("checkImages", () => {
     ]);
   });
 
+  test("an image with no contentUri is unfetchable and nothing is fetched", async () => {
+    const fetchStub = respond(200);
+    const d = doc(para(text("Pool"), inlineImage("kix.i1")));
+    delete d.inlineObjects!["kix.i1"].inlineObjectProperties.embeddedObject.imageProperties!
+      .contentUri;
+
+    await expect(checkImages(d, fetchStub)).resolves.toEqual([
+      { kind: "image-unfetchable", quote: "Pool" },
+    ]);
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  test("a 200 whose body fails to cancel is still a reachable image", async () => {
+    const fetchStub = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          new ReadableStream({
+            cancel() {
+              throw new Error("cancel failed");
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    const d = doc(para(text("Pool"), inlineImage("kix.i1")));
+    await expect(checkImages(d, fetchStub)).resolves.toEqual([]);
+  });
+
   test("only images are fetched, each one", async () => {
     const fetchStub = respond(200);
     const d = doc(
@@ -301,7 +348,8 @@ describe("commentText", () => {
 
   test("the table message reads as written", () => {
     expect(commentText({ kind: "table", quote: "Trash pickup" })).toBe(
-      'Website: this page has a table near "Trash pickup", and the website can\'t show tables. Please turn it into a list or plain paragraphs. The page will keep showing its previous version until this is fixed.',
+      "Website: this page has a table near \"Trash pickup\", and the website can't show tables. " +
+        "Please turn it into a list or plain paragraphs. The website won't show this change until it's fixed.",
     );
   });
 

@@ -52,7 +52,7 @@ export type ParagraphElement = {
   inlineObjectElement?: { inlineObjectId: string; textStyle?: TextStyle };
   person?: { personId?: string; personProperties?: { name?: string; email?: string } };
   richLink?: RichLink;
-  dateElement?: Record<string, unknown>;
+  dateElement?: { dateElementProperties?: { displayText?: string; [field: string]: unknown } };
 };
 
 /** The last run of a paragraph ends with "\n". */
