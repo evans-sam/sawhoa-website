@@ -2,15 +2,13 @@ import { cache } from "react";
 import { BlockedError } from "@/lib/content/blocked";
 import { loadDoc } from "@/lib/content/doc";
 import { createdAt } from "@/lib/content/files";
-import { googleId } from "@/lib/content/ids";
+import { FILE_ID, googleId } from "@/lib/content/ids";
 import type { Converted } from "@/lib/docs/convert";
 import { getFileMeta, GoogleError, listFolder, type DriveFile } from "@/lib/google/api";
 
 export type Announcement = { id: string; title: string; postedAt: Date; excerpt: string };
 
 const GOOGLE_DOC = "application/vnd.google-apps.document";
-/** The shape of a Drive file ID; anything else is not looked up. */
-const FILE_ID = /^[\w-]{10,}$/;
 /** Docs fetched from Google at once while listing. */
 const PARALLEL_LOADS = 5;
 

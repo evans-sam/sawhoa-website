@@ -1,5 +1,8 @@
 import google from "@/content/google.json";
 
+/** The shape of a Drive file ID; anything else is not looked up. */
+export const FILE_ID = /^[\w-]{10,}$/;
+
 type Ids = typeof google;
 type Section = "folders" | "pages" | "calendars";
 
