@@ -8,6 +8,8 @@ import Sidebar from "@/components/Sidebar";
 const oswald = Oswald({ variable: "--font-heading", subsets: ["latin"] });
 const sourceSans = Source_Sans_3({ variable: "--font-body", subsets: ["latin"] });
 
+export const revalidate = 120;
+
 export const metadata: Metadata = {
   title: "Sixth Avenue West HOA",
   description: "A wonderful place to live in Golden, Colorado",
