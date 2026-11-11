@@ -33,16 +33,24 @@ function* paragraphs(content: StructuralElement[]): Generator<Paragraph> {
   }
 }
 
-/** A paragraph's visible text, smart-chip titles and date chips included. */
+/**
+ * A paragraph's visible text, as the converter renders it: a smart chip is its
+ * title (or its address), a person chip their name (or email), a date chip its text.
+ */
 function paragraphText(paragraph: Paragraph): string {
-  return paragraph.elements
-    .map(
-      (e) =>
-        e.textRun?.content ??
-        e.richLink?.richLinkProperties.title ??
-        e.dateElement?.dateElementProperties?.displayText ??
-        "",
-    )
+  return (paragraph.elements ?? [])
+    .map((e) => {
+      if (e.textRun) return e.textRun.content ?? "";
+      if (e.richLink) {
+        const { uri, title } = e.richLink.richLinkProperties ?? {};
+        return title ?? uri ?? "";
+      }
+      if (e.person) {
+        const { name, email } = e.person.personProperties ?? {};
+        return name ?? email ?? "";
+      }
+      return e.dateElement?.dateElementProperties?.displayText ?? "";
+    })
     .join("");
 }
 
@@ -70,7 +78,7 @@ export function embeddedObject(doc: DocsDocument, id: string): EmbeddedObject | 
 function paragraphProblems(doc: DocsDocument, paragraph: Paragraph): Problem[] {
   const kinds: ProblemKind[] = [];
   if (paragraph.positionedObjectIds?.length) kinds.push("floating-image");
-  for (const element of paragraph.elements) {
+  for (const element of paragraph.elements ?? []) {
     if (element.inlineObjectElement) {
       const kind = objectKind(embeddedObject(doc, element.inlineObjectElement.inlineObjectId));
       if (kind !== "image") kinds.push(kind);
@@ -79,7 +87,7 @@ function paragraphProblems(doc: DocsDocument, paragraph: Paragraph): Problem[] {
     if (element.equation) kinds.push("equation");
     const url = element.textRun?.textStyle?.link?.url;
     if (url !== undefined && !isAllowedHref(url)) kinds.push("bad-link");
-    if (element.richLink && !isAllowedHref(element.richLink.richLinkProperties.uri ?? "")) {
+    if (element.richLink && !isAllowedHref(element.richLink.richLinkProperties?.uri ?? "")) {
       kinds.push("bad-link");
     }
   }
@@ -88,7 +96,7 @@ function paragraphProblems(doc: DocsDocument, paragraph: Paragraph): Problem[] {
 }
 
 function hasInlineImage(doc: DocsDocument, paragraph: Paragraph): boolean {
-  return paragraph.elements.some(
+  return (paragraph.elements ?? []).some(
     (e) =>
       e.inlineObjectElement &&
       objectKind(embeddedObject(doc, e.inlineObjectElement.inlineObjectId)) === "image",
@@ -156,7 +164,7 @@ export async function checkImages(
 ): Promise<Problem[]> {
   const checks: Promise<Problem | null>[] = [];
   for (const paragraph of paragraphs(doc.body.content)) {
-    for (const element of paragraph.elements) {
+    for (const element of paragraph.elements ?? []) {
       if (!element.inlineObjectElement) continue;
       const object = embeddedObject(doc, element.inlineObjectElement.inlineObjectId);
       if (objectKind(object) !== "image") continue;

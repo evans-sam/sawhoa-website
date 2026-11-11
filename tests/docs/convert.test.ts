@@ -241,7 +241,7 @@ describe("convertDoc", () => {
 
     test("a smart chip without a title shows its address", () => {
       const chip = richLink("https://x.org/a");
-      delete chip.richLink!.richLinkProperties.title;
+      delete chip.richLink!.richLinkProperties!.title;
       expect(convert(para(chip))).toBe(
         '<p><a href="https://x.org/a" rel="noopener">https://x.org/a</a></p>',
       );
@@ -330,6 +330,24 @@ describe("convertDoc", () => {
       { tableOfContents: { content: [para(text("Contents"))] } },
     );
     expect(html(d)).toBe("<p>Intro</p><p>A</p><p>B</p><p>C</p><p>D</p>");
+  });
+
+  test.each(["constructor", "toString", "__proto__", "hasOwnProperty", "NOT_A_STYLE"])(
+    "a paragraph in the unknown style %s becomes <p>",
+    (style) => {
+      expect(convert(styled(style, text("Hi")))).toBe("<p>Hi</p>");
+    },
+  );
+
+  test("missing text, elements and chip properties count as empty", () => {
+    const d = doc(
+      para(text("Before")),
+      { paragraph: { paragraphStyle: { namedStyleType: "NORMAL_TEXT" } } },
+      para({ textRun: { textStyle: { bold: true } } }, text("Run")),
+      para({ richLink: { richLinkId: "kix.rl9" } }, text("Chip")),
+    ) as unknown as DocsDocument;
+    expect(() => convertDoc(d, noPdfs)).not.toThrow();
+    expect(html(d)).toBe("<p>Before</p><p>Run</p><p>Chip</p>");
   });
 
   describe("faq", () => {

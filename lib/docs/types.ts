@@ -31,7 +31,8 @@ export type StructuralElement = {
 };
 
 export type Paragraph = {
-  elements: ParagraphElement[];
+  /** Missing is treated as no elements. */
+  elements?: ParagraphElement[];
   paragraphStyle?: ParagraphStyle;
   bullet?: { listId?: string; nestingLevel?: number; textStyle?: TextStyle };
   /** Images anchored to this paragraph and set to wrap or break text. */
@@ -62,8 +63,8 @@ export type ParagraphElement = {
   dateElement?: { dateElementProperties?: { displayText?: string; [field: string]: unknown } };
 };
 
-/** The last run of a paragraph ends with "\n". */
-export type TextRun = { content: string; textStyle?: TextStyle };
+/** The last run of a paragraph ends with "\n". Missing `content` is treated as "". */
+export type TextRun = { content?: string; textStyle?: TextStyle };
 
 export type TextStyle = {
   bold?: boolean;
@@ -87,7 +88,8 @@ export type Link = {
 /** A smart chip linking to a Google resource such as a Drive file. */
 export type RichLink = {
   richLinkId?: string;
-  richLinkProperties: { uri: string; title?: string; mimeType?: string };
+  /** Missing is treated as a chip with no address and no title. */
+  richLinkProperties?: { uri?: string; title?: string; mimeType?: string };
   textStyle?: TextStyle;
 };
 

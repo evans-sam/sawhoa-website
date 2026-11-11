@@ -60,7 +60,7 @@ export function para(...runs: ParagraphElement[]): StructuralElement {
   if (last?.textRun) {
     elements[elements.length - 1] = {
       ...last,
-      textRun: { ...last.textRun, content: last.textRun.content + "\n" },
+      textRun: { ...last.textRun, content: (last.textRun.content ?? "") + "\n" },
     };
   } else {
     elements.push({ textRun: { content: "\n", textStyle: {} } });

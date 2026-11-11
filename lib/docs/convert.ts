@@ -21,15 +21,15 @@ export type ConvertOptions = {
 };
 
 /** Pages keep the site's single <h1>, so each doc heading moves down one level. */
-const HEADING_TAGS: Record<string, string> = {
-  HEADING_1: "h2",
-  HEADING_2: "h3",
-  HEADING_3: "h4",
-  HEADING_4: "h5",
-  HEADING_5: "h6",
-  HEADING_6: "h6",
-};
-const HEADINGS = new Set(Object.values(HEADING_TAGS));
+const HEADING_TAGS = new Map([
+  ["HEADING_1", "h2"],
+  ["HEADING_2", "h3"],
+  ["HEADING_3", "h4"],
+  ["HEADING_4", "h5"],
+  ["HEADING_5", "h6"],
+  ["HEADING_6", "h6"],
+]);
+const HEADINGS = new Set(HEADING_TAGS.values());
 /** A doc "Heading 3", after the shift. */
 const FAQ_QUESTION_TAG = "h4";
 const UNORDERED_GLYPHS = new Set([undefined, "GLYPH_TYPE_UNSPECIFIED", "NONE"]);
@@ -95,7 +95,9 @@ function textNodes(content: string): ElementContent[] {
   return nodes;
 }
 
+/** Nodes wrapped in the run's bold, italic and strikethrough; no text gets no wrapper. */
 function withTextStyle(nodes: ElementContent[], style: TextStyle | undefined): ElementContent[] {
+  if (!nodes.length) return nodes;
   let result = nodes;
   if (style?.strikethrough) result = [el("s", {}, result)];
   if (style?.italic) result = [el("em", {}, result)];
@@ -111,7 +113,7 @@ function piece(doc: DocsDocument, element: ParagraphElement, opts: ConvertOption
   if (textRun) {
     const style = textRun.textStyle;
     return {
-      nodes: withTextStyle(textNodes(textRun.content), style),
+      nodes: withTextStyle(textNodes(textRun.content ?? ""), style),
       href: resolveHref(style?.link?.url, opts),
     };
   }
@@ -127,7 +129,7 @@ function piece(doc: DocsDocument, element: ParagraphElement, opts: ConvertOption
     };
   }
   if (richLink) {
-    const { uri, title } = richLink.richLinkProperties;
+    const { uri, title } = richLink.richLinkProperties ?? {};
     return { nodes: textNodes(title ?? uri ?? ""), href: resolveHref(uri, opts) };
   }
   if (person) {
@@ -145,7 +147,7 @@ function piece(doc: DocsDocument, element: ParagraphElement, opts: ConvertOption
 function inlineContent(doc: DocsDocument, paragraph: Paragraph, opts: ConvertOptions): ElementContent[] {
   const out: ElementContent[] = [];
   let open: Element | undefined;
-  for (const element of paragraph.elements) {
+  for (const element of paragraph.elements ?? []) {
     const { nodes, href } = piece(doc, element, opts);
     if (!nodes.length) continue;
     if (href === undefined) {
@@ -189,7 +191,7 @@ function blocks(doc: DocsDocument, opts: ConvertOptions): Element[] {
 
     if (!paragraph.bullet) {
       openLists = [];
-      out.push(el(HEADING_TAGS[style ?? ""] ?? "p", {}, children));
+      out.push(el(HEADING_TAGS.get(style ?? "") ?? "p", {}, children));
       continue;
     }
 

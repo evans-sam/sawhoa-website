@@ -13,6 +13,7 @@ import {
   inlineImage,
   pageBreak,
   para,
+  personChip,
   positioned,
   richLink,
   table,
@@ -58,6 +59,29 @@ describe("checkStructure", () => {
     expect(check(para(dateChip("Nov 11, 2026")))).toEqual([]);
     expect(check(para(text("Meeting on "), dateChip("Nov 11, 2026"), equation()))).toEqual([
       { kind: "equation", quote: "Meeting on Nov 11, 2026" },
+    ]);
+  });
+
+  test("a doc with only a person chip is not empty, and the chip is quoted by name or email", () => {
+    expect(check(para(personChip({ name: "Sam" })))).toEqual([]);
+    expect(check(para(personChip({ email: "kim@example.com" })))).toEqual([]);
+    expect(
+      check(
+        para(text("Ask "), personChip({ name: "Sam", email: "sam@example.com" }), equation()),
+        para(text("Or "), personChip({ email: "kim@example.com" }), equation()),
+      ),
+    ).toEqual([
+      { kind: "equation", quote: "Ask Sam" },
+      { kind: "equation", quote: "Or kim@example.com" },
+    ]);
+  });
+
+  test("a smart chip with no title counts as its address", () => {
+    const chip = richLink("https://x.org/a");
+    delete chip.richLink!.richLinkProperties!.title;
+    expect(check(para(chip))).toEqual([]);
+    expect(check(para(text("See "), chip, equation()))).toEqual([
+      { kind: "equation", quote: "See https://x.org/a" },
     ]);
   });
 
