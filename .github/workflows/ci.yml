@@ -31,8 +31,10 @@ jobs:
       - name: Tests
         run: npm test
 
+      # A fresh checkout has no .next folder, so Next's generated route types
+      # (LayoutProps, PageProps) must be created before tsc can find them.
       - name: Type check
-        run: npx tsc --noEmit
+        run: npx next typegen && npx tsc --noEmit
 
       - name: Lint
         run: npm run lint
