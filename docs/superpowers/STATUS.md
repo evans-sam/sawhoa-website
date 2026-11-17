@@ -138,7 +138,12 @@ them and may overturn any.
 - Commits use Sam's GitHub no-reply address (set in this repo's git config). Keep it that
   way: he chose it so his personal address is not in public history.
 - No attribution lines in commit messages or pull request descriptions.
-- There is no CI. Adding a workflow for tests, types and lint was offered and not yet taken.
+- CI is a GitHub Actions workflow, `.github/workflows/ci.yml`: tests, type check, lint and
+  build on every pull request and every push to `main`. Vercel CI was considered and ruled
+  out because it does not support public repositories. Once Task 10 lands the build step
+  reads Google, so it will need `GOOGLE_SERVICE_ACCOUNT_KEY_B64` as a GitHub repository
+  secret; GitHub does not give secrets to pull requests from forks, so those would fail
+  the build step.
 - Vercel appears to be connected: its bot opened pull requests 2 (Speed Insights) and 3
   (Web Analytics) on 2026-11-16. They are open and unreviewed, and are not part of the plan.
   Vercel's free plan is for non-commercial use; whether an HOA taking dues qualifies is a
