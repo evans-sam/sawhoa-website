@@ -1,0 +1,45 @@
+name: CI
+
+# Runs the same four checks CLAUDE.md asks for before any commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Tests, types, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      # A fresh checkout has no .next folder, so Next's generated route types
+      # (LayoutProps, PageProps) must be created before tsc can find them.
+      - name: Type check
+        run: npx next typegen && npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      # Once the pages read from Google (plan Task 10), this step needs
+      # GOOGLE_SERVICE_ACCOUNT_KEY_B64 supplied as a repository secret.
+      - name: Build
+        run: npm run build
