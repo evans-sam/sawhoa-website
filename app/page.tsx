@@ -1,69 +1,45 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { announcements, images } from "@/content/site";
+
+const fmt = (d: string) =>
+  new Date(`${d}T12:00:00`).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <h1>Welcome to Sixth Avenue West</h1>
+      <p className="lede">
+        Sixth Avenue West is a wonderful community consisting of 532 single-family homes nestled up
+        against Green Mountain just south of 6th Avenue West Freeway and east of Indiana Street.
+        Sixth Avenue West has an active voluntary Homeowners&rsquo; Association and is also a
+        covenant controlled community.
+      </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="hero-img" src={images.greenMountain} alt="Trail on Green Mountain" />
+
+      <h2>Announcements</h2>
+      <ul className="feed">
+        {announcements.map((a) => (
+          <li key={a.date + a.title}>
+            <time dateTime={a.date}>{fmt(a.date)}</time>
+            <h3>{a.title}</h3>
+            <p>{a.body}</p>
+          </li>
+        ))}
+      </ul>
+
+      <h2>Support the neighborhood</h2>
+      <p>
+        Membership is voluntary and costs $50 a year. Dues pay for the newsletter, community events
+        and upkeep of shared spaces.
+      </p>
+      <Link href="/pay-dues" className="button">
+        Pay annual dues
+      </Link>
+    </>
   );
 }

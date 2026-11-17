@@ -1,24 +1,33 @@
 {
-  "name": "sawhoa-prototype",
+  "name": "sawhoa-website",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "content:discover": "tsx --env-file=.env.local scripts/discover.ts"
   },
   "dependencies": {
+    "google-auth-library": "^11.3.4",
+    "hast-util-to-jsx-runtime": "^2.3.7",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@types/hast": "^3.0.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
-    "typescript": "^5"
+    "hast-util-to-html": "^9.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^4.1.12"
   }
 }

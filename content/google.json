@@ -1,0 +1,21 @@
+{
+  "rootFolderId": "",
+  "folders": {
+    "pages": "",
+    "announcements": "",
+    "newsletters": "",
+    "documents": ""
+  },
+  "pages": {
+    "home": "",
+    "about": "",
+    "faq": "",
+    "buyingSelling": "",
+    "documents": "",
+    "payDues": ""
+  },
+  "calendars": {
+    "events": "",
+    "banner": ""
+  }
+}
