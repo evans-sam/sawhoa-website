@@ -3,7 +3,11 @@
 Design, 2026-11-11. First of four projects for the custom rebuild of sawhoa.com.
 
 Labels used below: **Decided** = Sam said it. **My call** = Claude chose it; Sam has not
-agreed to it and may overturn it. **Builder** = left to whoever builds it.
+agreed to it and may overturn it. **Builder** = left to whoever builds it. **Ruled in
+build** = settled while building, where this document was silent or the plan was wrong;
+Sam was told and may overturn it.
+
+Build progress, what is left, and how to resume: `docs/superpowers/STATUS.md`.
 
 ## 1. Intent
 
@@ -134,6 +138,8 @@ The page-to-doc mapping, folder IDs and calendar IDs live in one settings file i
   body is the text, the doc's created time is the post date. (My call. Known limit: no
   backdating or date correction.)
 - A doc whose title starts with `DRAFT` (any case) is ignored everywhere. (My call.)
+  "Everywhere" includes its images: the image route refuses a draft's pictures. (Ruled in
+  build.)
 - Deleting a doc, or moving it out of the folder, removes the post. No separate unpublish.
 - Each announcement has its own page. Its address must not change when the title is edited.
   (Builder: how; the doc's file ID is the stable handle.)
@@ -194,6 +200,9 @@ A calendar entry with a problem (for example no title) is skipped, silently.
   with a new version in Drive keeps the same link.
 - The board must not have to set "anyone with the link" sharing for PDFs to work. Serving
   them through the site using the service account is the obvious route. (Builder: how.)
+- Built as two routes: `/files/<id>` serves a PDF only if it sits in the Newsletters or
+  Documents folder; `/media/<docId>/<objectId>` serves an image only from a page doc or a
+  published announcement. Anything else answers "not found". (Ruled in build.)
 
 ## 9. How content gets to the site
 
@@ -220,15 +229,24 @@ A calendar entry with a problem (for example no title) is skipped, silently.
 
 - Read docs through the Google Docs API with suggestions excluded, so pending suggested
   edits never reach the site.
-- Converter (My call): `@googleworkspace/google-docs-hast`, published under Google's
-  Workspace GitHub organisation, last released March 2024, three small dependencies. It
-  turns the API response into an HTML tree the site can restyle.
+- Converter (Ruled in build): written in-house, in `lib/docs/convert.ts`. It turns the API
+  response into an HTML tree (hast) the site restyles.
+  - The original call was `@googleworkspace/google-docs-hast`, with an in-house converter
+    named as the fallback. Reading the library's source during the build showed it carries
+    the doc's inline styles and classes into the page, loses bold and italic inside links,
+    has no date-chip support, logs a warning on every section break, and throws on a missing
+    object. The fallback was taken and the library is not a dependency.
   - Sam's stated preference was `docs-markdown` "if well supported". It is not: its last
-    release was April 2020. That is why it is not the choice here.
-  - Fallback if the chosen library disappoints on real docs: a small in-house converter. The
-    supported element set is short (below) and the checker already walks the same structure.
-- Supported content: headings, paragraphs, bold, italic, links, bulleted and numbered lists,
-  images. The site applies its own fonts, colours, sizes and spacing; the doc's are ignored.
+    release was April 2020.
+- Supported content: headings, paragraphs, bold, italic, strikethrough, links, bulleted and
+  numbered lists, soft line breaks, images, date chips (shown as their text), people chips
+  (shown as the name, no link), and file/link chips (shown as a link). The site applies its
+  own fonts, colours, sizes and spacing; the doc's are ignored. Doc "Heading 1" renders as
+  the page's second-level heading, so each page keeps a single top heading from the site.
+- Only the first tab of a doc is the page. Other tabs are neither shown nor checked. (Ruled
+  in build.)
+- A link that is not a normal web, email or phone link never reaches the page, whatever it
+  was attached to, images included. (Ruled in build.)
 - Images: the image addresses the Docs API returns expire within minutes to hours. They must
   not be used directly in pages. (Builder: how to serve them durably at no cost.)
 
@@ -241,7 +259,13 @@ A calendar entry with a problem (for example no title) is skipped, silently.
 - Content the site cannot show but that carries meaning: tables, drawings, charts,
   equations, footnotes, embedded objects other than images. (My call: block, do not drop
   silently, because dropping changes what the page says.)
-- An image that cannot be fetched.
+- An image set to wrap text (a floating image). The comment tells the editor to set it to
+  "In line". (Ruled in build: the converter cannot place these, and dropping one silently
+  changes the page.)
+- An image that is definitely broken: Google answers "not found" or similar for it. A
+  temporary failure fetching an image (timeout, server error, rate limit) is not a problem
+  with the doc: it is treated like Google being unreachable, so the last good page stays and
+  no comment is posted. (Ruled in build.)
 - A link that is not a well-formed web, email or phone link. Links are checked for form
   only, not for whether the destination is up. (My call.)
 
@@ -255,7 +279,11 @@ A calendar entry with a problem (for example no title) is skipped, silently.
   wrong and what to do, and quoting the offending text so the editor can find it. Google
   Docs does not honour comment positions set through the API, so comments cannot be pinned
   to the spot.
+- Every comment starts `Website: ` and ends "The website won't show this change until it's
+  fixed." (Ruled in build; the wording must also be true for an announcement that has never
+  been published.)
 - One open comment per problem. Do not post the same comment again on every regeneration.
+  Two regenerations running at the same moment can each post one; that is accepted.
 - When the doc passes, the site resolves its own earlier comments.
 - The site has no database. The doc's own comment list is the record of what has been
   reported. (My call.)
@@ -305,6 +333,14 @@ A calendar entry with a problem (for example no title) is skipped, silently.
   case.
 
 ## 13. Unverified, to settle with a short trial at the start of the build
+
+Status at 2026-11-16: none of the three below has been run, because no Google test account
+exists yet. Settled so far: the keep-the-last-good-page behaviour was proven locally (a
+failed regeneration kept serving the old page; a throwing page failed the build). Not yet
+proven on the real host. Added during the build, also waiting on a live account: whether
+Drive returns a comment's text exactly as posted (the no-duplicates rule depends on it),
+whether large PDFs stream within the host's response limits, and three details of the Docs
+data format (date chips, list markers, soft line breaks).
 
 1. **Do editors get an email when the service account comments?** The whole "tell the
    editor" path assumes Google notifies people on the doc. Not confirmed for comments
