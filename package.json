@@ -12,6 +12,7 @@
     "content:discover": "tsx --env-file=.env.local scripts/discover.ts"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.1.0",
     "google-auth-library": "^11.3.4",
     "hast-util-to-jsx-runtime": "^2.3.7",

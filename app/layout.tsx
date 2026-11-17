@@ -4,6 +4,7 @@ import Link from "next/link";
 import "./globals.css";
 import { banner, images } from "@/content/site";
 import Sidebar from "@/components/Sidebar";
+import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const oswald = Oswald({ variable: "--font-heading", subsets: ["latin"] });
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <p>Sixth Avenue West Homeowners&rsquo; Association · P.O. Box 18111, Golden, CO 80402-6035</p>
           <p className="proto">Prototype for comparison. Sample content is marked SAMPLE.</p>
         </footer>
+        <Analytics />
         <SpeedInsights />
       </body>
     </html>
