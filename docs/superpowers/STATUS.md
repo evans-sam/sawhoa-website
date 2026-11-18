@@ -37,22 +37,45 @@ Merged to `main` (pull request 1, squash-merged):
 **The site still shows stand-in content.** The pages read `content/site.ts`; nothing is wired
 to the loaders until Task 10. Nothing has ever run against real Google.
 
-### Blocked on Sam: the Google test account (plan Task 0)
+### The Google test account (plan Task 0): content done, access not
 
-`board@sawhoa.com` is the intended owner but Sam cannot reach it yet, so the build uses a
-separate test Google account. Sam has the setup steps. What the next session needs from him:
+`board@sawhoa.com` is the intended owner but Sam cannot reach it yet, so the build uses
+Sam's personal Google account as the test account.
 
-1. The `Website content` folder ID and the two calendar IDs.
-2. The service-account key, base64-encoded, in `.env.local` as
+Done on 2026-11-16, through the Google connectors in a Claude session:
+
+- Folder `Website content (TEST)` in Sam's Drive, ID `1HDRMo7zuAZMr1y6UBO6dzyf-jmYcJsBj`,
+  with `Pages`, `Announcements`, `Newsletters` and `Documents` inside it.
+- `Pages`: the six docs (`Home`, `About`, `FAQ`, `Buying and Selling`, `Documents`,
+  `Pay Dues`), filled with the prototype's copy. FAQ uses Heading 2 for categories and
+  Heading 3 for questions. `Documents` links to the two PDFs in the Documents folder.
+- `Announcements`: three `SAMPLE:` posts and one `DRAFT SAMPLE:` post that must stay hidden.
+- `Newsletters`: two one-page placeholder PDFs (Fall 2025 uploaded first, then Spring 2026).
+  `Documents`: two placeholder PDFs (covenants, bylaws).
+- Calendars `SAWHOA Events (test)` and `SAWHOA Banner (test)`, created by Sam. Events has
+  three `SAMPLE:` entries (a timed one with a location on 2026-12-08, an all-day one on
+  2026-12-19, a timed one with no location or description on 2027-01-12). Banner has one
+  all-day entry running 2026-11-16 to 2026-12-08 and one that starts 2027-01-01, which
+  must not show before then.
+- `content/google.json` holds every Drive ID above and both calendar IDs. It was filled by
+  hand from the connector results, not by `content:discover`; running discover later
+  should produce the same file.
+
+Still needed from Sam, because the connectors cannot do these:
+
+1. A Google Cloud project with the Drive, Docs and Calendar APIs switched on, a service
+   account, and its key, base64-encoded, in `.env.local` as
    `GOOGLE_SERVICE_ACCOUNT_KEY_B64`. Never pasted into chat, never committed.
+2. The service account's email address shared on `Website content (TEST)` as Commenter and
+   on both calendars with "See all event details". A session can do the folder share if
+   given the address; the calendar shares are done in Calendar settings.
 
-The six page docs must be named `Home`, `About`, `FAQ`, `Buying and Selling`, `Documents`,
-`Pay Dues`.
+Not yet in the test content: an image in a doc (needed to try the `/media` route).
 
 ### What to do next, in order
 
 1. Task 3 Step 5: `npm run content:discover <rootFolderId> <eventsCalId> <bannerCalId>`, then
-   a calendar read. Fills `content/google.json`.
+   a calendar read. Confirms `content/google.json` and adds the calendar IDs.
 2. Task 5 Step 6: run the converter on the real About and FAQ text; save fixtures.
 3. Task 9 Step 5: view a PDF through `/files/<id>` without being signed in to Google.
 4. Task 10: wire the pages, add the News pages, live check.
